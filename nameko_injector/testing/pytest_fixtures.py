@@ -2,6 +2,7 @@ import pytest
 
 from ..core import NamekoInjector
 
+
 @pytest.fixture
 def injector_bindings():
     """Mapping of the overriding bindings for service injector."""
@@ -19,7 +20,7 @@ def injector_in_test(service_class, injector_bindings):
 def service_class():
     raise NotImplementedError(
         'Redefine fixture "service_class" to return class of the service '
-        'under the test. Usually it is a class of the service that is tested.'
+        "under the test. Usually it is a class of the service that is tested."
     )
 
 

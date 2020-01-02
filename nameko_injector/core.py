@@ -18,7 +18,6 @@ request = inj.ScopeDecorator(RequestScope)
 
 
 class NamekoInjector(inj.Injector):
-
     def __init__(self, *, bindings: t.Mapping) -> None:
         super().__init__(modules=bindings.values())
         self.__bindings = bindings
@@ -29,7 +28,7 @@ class NamekoInjector(inj.Injector):
 
         for member_name in dir(service_cls):
             member = getattr(service_cls, member_name)
-            if callable(member) and getattr(member, 'nameko_entrypoints', 0):
+            if callable(member) and getattr(member, "nameko_entrypoints", 0):
                 setattr(service_cls, member_name, self.inject(member))
 
         return service_cls
@@ -39,14 +38,12 @@ class NamekoInjector(inj.Injector):
 
         @functools.wraps(fn)
         def decorated(*args, **kwargs):
-            return self.call_with_injection(
-                callable=fn, args=args, kwargs=kwargs
-            )
+            return self.call_with_injection(callable=fn, args=args, kwargs=kwargs)
+
         return decorated
 
 
 class NamekoInjectorProvider(DependencyProvider):
-
     def __init__(self, injector):
         self._injector = injector
 

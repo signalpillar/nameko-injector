@@ -13,7 +13,6 @@ class ContainerConfig(t.NamedTuple):
 
 
 class ContainerRawConfigModule(inj.Module):
-
     def __init__(self, container) -> None:
         self.container = container
 
@@ -31,19 +30,17 @@ class Config(t.NamedTuple):
 
 
 class ConfigModule(inj.Module):
-
     def __init__(self, scope):
         self._scope = scope
 
-    def configure(self, binder) -> Config:
+    def configure(self, binder):
         binder.bind(Config, to=Config(feature_x_enabled=True), scope=self._scope)
 
 
 class FailingConfigModule(inj.Module):
-
     @inj.provider
     def config_provider(self) -> Config:
-        raise ValueError('Failed to create config')
+        raise ValueError("Failed to create config")
 
 
 class MetadataModule(inj.Module):
@@ -52,31 +49,28 @@ class MetadataModule(inj.Module):
 
     @inj.provider
     def provide(self) -> Metadata:
-        return Metadata(debug_id='debug-id-provided')
+        return Metadata(debug_id="debug-id-provided")
 
 
-INJECTOR = NamekoInjector(bindings=dict(
-    config=ConfigModule(scope=inj.singleton),
-    metadata=MetadataModule(scope=request),
-))
+INJECTOR = NamekoInjector(
+    bindings=dict(
+        config=ConfigModule(scope=inj.singleton),
+        metadata=MetadataModule(scope=request),
+    )
+)
 
 
 @INJECTOR.decorate_service
 class Service:
 
-    name = 'test-service'
+    name = "test-service"
 
-    @http('GET', '/config')
+    @http("GET", "/config")
     def view_singleton_config(self, request, config: Config):
-        return json.dumps({
-            'feature_x': config.feature_x_enabled,
-            'id': id(config),
-        })
+        return json.dumps({"feature_x": config.feature_x_enabled, "id": id(config),})
 
-    @http('GET', '/worker/context/<int:id_>')
+    @http("GET", "/worker/context/<int:id_>")
     def view_worker_context(self, request, id_, context: WorkerContext):
-        return json.dumps(dict(
-            service_name=context.service_name,
-            call_id=context.call_id,
-            id=id_,
-        ))
+        return json.dumps(
+            dict(service_name=context.service_name, call_id=context.call_id, id=id_,)
+        )
