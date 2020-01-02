@@ -9,7 +9,7 @@ from nameko.extensions import DependencyProvider
 class RequestScope(inj.Scope):
     """A scope whose object lifetime is tied to a request."""
 
-    def get(self, key: t.Any, provider: inj.Provider) -> t.Any:
+    def get(self, _: t.Any, provider: inj.Provider) -> t.Any:
         return provider
 
 
