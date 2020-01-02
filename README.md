@@ -57,3 +57,4 @@ tox
 ## TODO
 
 - testing: Add the tests for RPC entrypoints
+- document testing with the library

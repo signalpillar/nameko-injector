@@ -1,5 +1,5 @@
 from pathlib import Path
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def main():
@@ -24,7 +24,7 @@ def main():
             "Topic :: Utilities",
             "Programming Language :: Python",
         ],
-        packages=["nameko_injector",],
+        packages=find_packages(),
         py_modules=["nameko_injector"],
         install_requires=["nameko>=2.0.0", "injector>=0.18.0"],
     )
