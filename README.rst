@@ -94,7 +94,7 @@ In more *sophisticated* cases when we redefine how the server is started with
 ``runner_factories`` main task is to ensure that the container (service instance
 basically) has a valid injector. See
 ``nameko_injector/testing/pytest_fixtures.py:web_service`` code as an example.
-Main line there is ``replace_dependencies(container, injector=injector_in_test)``.
+Main line there is ``replace_dependencies(container, **container_overridden_dependencies)``.
 
 Development
 -----------
