@@ -40,13 +40,6 @@ def service_class():
 
 
 @pytest.fixture
-def runner_and_container(runner_factory, service_class, web_config):
-    runner = runner_factory(web_config, service_class)
-    container = get_container(runner, service_class)
-    yield runner, container
-
-
-@pytest.fixture
 def container_overridden_dependencies(injector_in_test):
     """Return provider name to a new value to be set on the container."""
     # setting injector to injector_in_test is needed in 99% of the tests
@@ -55,10 +48,11 @@ def container_overridden_dependencies(injector_in_test):
 
 @pytest.fixture
 def web_service(
-    runner_and_container, web_config, service_class, container_overridden_dependencies
+    service_class, container_overridden_dependencies, runner_factory, web_config
 ):
     """Start service ready to serve HTTP requests."""
-    runner, container = runner_and_container
+    runner = runner_factory(web_config, service_class)
+    container = get_container(runner, service_class)
     replace_dependencies(container, **container_overridden_dependencies)
     runner.start()
     yield
