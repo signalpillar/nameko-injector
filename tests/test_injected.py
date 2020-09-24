@@ -33,22 +33,36 @@ def test_singleton_config_injected(web_session):
     assert 1 == len(data)
 
 
-def test_request_scoped_injected(web_session):
-    threads = [
-        eventlet.spawn(web_session.get, f"/worker/context/{id_}") for id_ in range(10)
-    ]
-    responses = [t.wait() for t in threads]
-    assert {200} == {r.status_code for r in responses}
-    all_call_ids = {r.json()["call_id"] for r in responses}
-    assert 10 == len(all_call_ids)
+class TestRequestScopeInPureConfiguration:
+    @pytest.fixture
+    def container_overridden_dependencies(self):
+        # we need a vanilla behaviour of the service without replacing test injector
+        # etc therefore we redefine fixture to not override any providers on the
+        # service.
+        # Without this change service will use injector_in_test that has mocked
+        # worker_ctx bound. Our test will not get unique worker contexts on each call.
+        return {}
+
+    def test_request_scoped_injected(self, web_session):
+        threads = [
+            eventlet.spawn(web_session.get, f"/worker/context/{id_}")
+            for id_ in range(10)
+        ]
+        responses = [t.wait() for t in threads]
+        assert {200} == {r.status_code for r in responses}
+        all_call_ids = {r.json()["call_id"] for r in responses}
+        assert 10 == len(all_call_ids)
 
 
 class TestErrorRaisedDuringInjection:
     """Test behaviour of the entrypoint when dependency injection fails."""
 
     @pytest.fixture
-    def injector_bindings(self):
-        return {"metadata": dummy_service.FailingConfigModule()}
+    def injector_in_test(self, injector_in_test):
+        # Override config binding on the service by specifying another one in
+        # child injector that will be used on the service instance.
+        injector_in_test.binder.install(dummy_service.FailingConfigModule())
+        return injector_in_test
 
     def test_http(self, web_session):
         response = web_session.get("/config")

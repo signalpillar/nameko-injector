@@ -5,7 +5,7 @@ import injector as inj
 from nameko.containers import WorkerContext
 from nameko.web.handlers import http
 
-from nameko_injector.core import NamekoInjector, request
+from nameko_injector.core import NamekoInjector, request_scope
 
 
 class ContainerConfig(t.NamedTuple):
@@ -38,6 +38,9 @@ class ConfigModule(inj.Module):
 
 
 class FailingConfigModule(inj.Module):
+    def configure(self, binder):
+        binder.bind(Config, to=self.config_provider, scope=request_scope)
+
     @inj.provider
     def config_provider(self) -> Config:
         raise ValueError("Failed to create config")
@@ -53,10 +56,7 @@ class MetadataModule(inj.Module):
 
 
 INJECTOR = NamekoInjector(
-    bindings=dict(
-        config=ConfigModule(scope=inj.singleton),
-        metadata=MetadataModule(scope=request),
-    )
+    [ConfigModule(scope=inj.singleton), MetadataModule(scope=request_scope)]
 )
 
 
@@ -67,10 +67,10 @@ class Service:
 
     @http("GET", "/config")
     def view_singleton_config(self, request, config: Config):
-        return json.dumps({"feature_x": config.feature_x_enabled, "id": id(config),})
+        return json.dumps({"feature_x": config.feature_x_enabled, "id": id(config)})
 
     @http("GET", "/worker/context/<int:id_>")
     def view_worker_context(self, request, id_, context: WorkerContext):
         return json.dumps(
-            dict(service_name=context.service_name, call_id=context.call_id, id=id_,)
+            dict(service_name=context.service_name, call_id=context.call_id, id=id_)
         )

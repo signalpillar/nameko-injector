@@ -1,5 +1,5 @@
-import typing as t
 import functools
+import typing as t
 
 import injector as inj
 from nameko.containers import ServiceContainer, WorkerContext
@@ -13,18 +13,12 @@ class RequestScope(inj.Scope):
         return provider
 
 
-# rename to entrypoint_scope to follow naming of nameko
-request = inj.ScopeDecorator(RequestScope)
+request_scope = inj.ScopeDecorator(RequestScope)
 
 
 class NamekoInjector(inj.Injector):
-    def __init__(self, *, bindings: t.Mapping) -> None:
-        super().__init__(modules=bindings.values())
-        self.__bindings = bindings
-
     def decorate_service(self, service_cls):
         service_cls.injector = NamekoInjectorProvider(self)
-        service_cls.__injector_bindings__ = self.__bindings
 
         for member_name in dir(service_cls):
             member = getattr(service_cls, member_name)
@@ -38,18 +32,30 @@ class NamekoInjector(inj.Injector):
 
         @functools.wraps(fn)
         def decorated(*args, **kwargs):
-            return self.call_with_injection(callable=fn, args=args, kwargs=kwargs)
+            # Instance of service that owns the entrypoint
+            service_instance = args[0]
+            # Child injector by NamekoInjectorProvider
+            instance_injector = service_instance.injector
+            # use it to resolve the dependencies
+            return instance_injector.call_with_injection(
+                callable=fn, args=args, kwargs=kwargs
+            )
 
         return decorated
 
 
 class NamekoInjectorProvider(DependencyProvider):
-    def __init__(self, injector):
-        self._injector = injector
+    def __init__(self, parent_injector: inj.Injector):
+        # Bindings from the parent injector are shared between the calls.
+        self.parent_injector = parent_injector
 
     def setup(self):
-        self._injector.binder.bind(ServiceContainer, to=self.container)
+        # ServiceContainer is shared between the calls so it's in parent injector
+        self.parent_injector.binder.bind(ServiceContainer, to=self.container)
 
     def get_dependency(self, worker_ctx):
-        self._injector.binder.bind(WorkerContext, worker_ctx, scope=request)
-        return self._injector
+        # Create child injector that will be used by decorated entrypoints.
+        # Having child injector is something that will help us in testing.
+        child_injector = self.parent_injector.create_child_injector()
+        child_injector.binder.bind(WorkerContext, worker_ctx, scope=request_scope)
+        return child_injector

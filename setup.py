@@ -1,5 +1,6 @@
 from pathlib import Path
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 
 def main():
@@ -7,7 +8,7 @@ def main():
         name="nameko-injector",
         description="Injector support in nameko",
         long_description=Path("README.rst").read_text(),
-        version="0.1.2",
+        version="1.0.0",
         url="https://github.com/signalpillar/nameko-injector",
         license="MIT",
         platforms=["linux", "osx"],
