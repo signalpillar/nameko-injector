@@ -8,7 +8,7 @@ def main():
         name="nameko-injector",
         description="Injector support in nameko",
         long_description=Path("README.rst").read_text(),
-        version="1.0.0",
+        version="1.0.1",
         url="https://github.com/signalpillar/nameko-injector",
         license="MIT",
         platforms=["linux", "osx"],
