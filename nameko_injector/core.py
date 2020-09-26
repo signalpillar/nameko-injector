@@ -4,13 +4,25 @@ import typing as t
 import injector as inj
 from nameko.containers import ServiceContainer, WorkerContext
 from nameko.extensions import DependencyProvider
+from eventlet import corolocal
 
 
 class RequestScope(inj.Scope):
     """A scope whose object lifetime is tied to a request."""
 
-    def get(self, _: t.Any, provider: inj.Provider) -> t.Any:
-        return provider
+    def configure(self) -> None:
+        # Only eventlet at the moment though there is greenlet support on the roadmap.
+        # The type of locals is the only difference between this implementation and
+        # injector.ThreadLocalScope
+        self._locals = corolocal.local()
+
+    def get(self, interface: t.Any, provider: inj.Provider) -> inj.Provider:
+        try:
+            return getattr(self._locals, repr(interface))
+        except AttributeError:
+            provider = inj.InstanceProvider(provider.get(self.injector))
+            setattr(self._locals, repr(interface), provider)
+            return provider
 
 
 request_scope = inj.ScopeDecorator(RequestScope)
