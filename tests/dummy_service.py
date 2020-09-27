@@ -74,3 +74,15 @@ class Service:
         return json.dumps(
             dict(service_name=context.service_name, call_id=context.call_id, id=id_)
         )
+
+    @http("GET", "/injector/access")
+    def check_injector_access(
+        self, request, injector: inj.Injector, binder: inj.Binder
+    ):
+        # Injector can be accessed both from the service state and as a param.
+        injector_from_nameko_injector_provider = self.injector  # type: ignore
+        assert injector_from_nameko_injector_provider is injector
+        # Same applies to binder.
+        assert injector_from_nameko_injector_provider.binder is binder
+        # This functionality is provided by the 'injector' library.
+        return "ok"

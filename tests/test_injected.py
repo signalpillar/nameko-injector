@@ -68,3 +68,9 @@ class TestErrorRaisedDuringInjection:
         response = web_session.get("/config")
         assert 500 == response.status_code
         assert b"Error: ValueError: Failed to create config\n" == response.content
+
+
+def test_injector_access(web_session):
+    response = web_session.get("/injector/access")
+    assert 200 == response.status_code
+    assert b"ok" == response.content
