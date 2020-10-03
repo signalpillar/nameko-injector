@@ -1,13 +1,14 @@
 import functools
+import itertools
 import logging
 import typing as t
 from weakref import WeakKeyDictionary
-import itertools
 
 import injector as inj
 from eventlet import corolocal
 from nameko.containers import ServiceContainer, WorkerContext
 from nameko.extensions import DependencyProvider
+from werkzeug.wrappers import Request
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +54,10 @@ resource_request_scope = inj.ScopeDecorator(ResourceAwareRequestScope)
 
 
 class NamekoInjector(inj.Injector):
+    def __init__(self, modules, *args, **kwargs):
+        super().__init__(modules, *args, **kwargs)
+        self._modules = modules
+
     def decorate_service(self, service_cls):
         service_cls.injector = NamekoInjectorProvider(self)
 
@@ -81,7 +86,7 @@ class NamekoInjector(inj.Injector):
 
 
 class NamekoInjectorProvider(DependencyProvider):
-    def __init__(self, parent_injector: inj.Injector):
+    def __init__(self, parent_injector: NamekoInjector):
         # Bindings from the parent injector are shared between the calls.
         self.parent_injector = parent_injector
         # Mapping of a worker context to child injector created for it.
@@ -96,10 +101,19 @@ class NamekoInjectorProvider(DependencyProvider):
         )
 
     def get_dependency(self, worker_ctx):
-        # Create child injector that will be used by decorated entrypoints.
+        # Create child injector that will be used by entrypoints.
         # Having child injector is something that will help us in testing and also
         # isolate request-level dependencies bound per entry-point.
-        child_injector = self.parent_injector.create_child_injector()
+        child_injector = self.parent_injector.create_child_injector(
+            self.parent_injector._modules
+        )
+
+        if worker_ctx.args and isinstance(worker_ctx.args[0], Request):
+            request = worker_ctx.args[0]
+            child_injector.binder.bind(
+                Request, to=inj.InstanceProvider(request), scope=request_scope
+            )
+
         child_injector.binder.bind(WorkerContext, worker_ctx, scope=request_scope)
         self._injector_by_worker_ctx[worker_ctx] = child_injector
         return child_injector

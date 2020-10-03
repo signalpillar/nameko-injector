@@ -25,6 +25,7 @@ be used out of the box without special injector module declarations.
 
 - ``from nameko.containers.ServiceContainer``
 - ``from nameko.containers.WorkerContext``
+- ``werkzeug.wrappers.Request``, in case of HTTP requests
 
 An example:
 
@@ -61,6 +62,14 @@ To enable the plugin, add the following line in your ``conftest.py`` module.
       "nameko_injector.testing.pytest_fixtures",
   ]
 
+Graph of fixtures generated from the test
+
+.. code:: bash
+
+   pytest --fixture-graph tests/test_http.py::test_http_request_injected
+
+.. image:: assets/fixtures_graph.png
+
 There are several fixtures that help during the testing. All of the fixtures
 have ``function`` pytest scope.
 
@@ -70,6 +79,9 @@ have ``function`` pytest scope.
 
 - ``injector_in_test`` fixture gives access to the ``injector.Injector`` instance that will resolve the dependencies in the service instance of ``service_class``.
   The fixture uses a child injector from the one that decorates the service that provides isolation between the test cases with the same class under the test.
+
+- ``container_overridden_dependencies`` - ``web_service`` uses this mapping of
+  nameko dependencies that need to be overridden with the instance values.
 
 - ``worker_ctx`` fixture is used to get ``injector_in_test`` value but it's a mock
   and might be redefined in your tests.
