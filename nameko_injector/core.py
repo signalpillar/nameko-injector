@@ -16,7 +16,7 @@ class BaseError(Exception):
 
 
 class RequestScope(inj.Scope):
-    """A scope whose object lifetime is tied to a request."""
+    """A scope defines lifetime bound to a service request."""
 
     def configure(self) -> None:
         # Only eventlet at the moment though there is greenlet support on the roadmap.
