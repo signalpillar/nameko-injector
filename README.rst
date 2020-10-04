@@ -38,6 +38,7 @@ The library provides 2 **scopes**:
 An example of the test that declares service class and configuration provider:
 
 .. code:: python
+   :emphasize-lines: 32-35
 
     import json
     import typing as t
