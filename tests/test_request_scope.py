@@ -5,7 +5,7 @@ from nameko.web.handlers import http
 from nameko_injector.core import request_scope, NamekoInjector
 
 
-from .dummy_service import Config, ConfigModule
+from .dummy_service import Config
 
 
 class ConfigWrapper:
@@ -18,7 +18,7 @@ def provide_wrapped_config(config: Config) -> ConfigWrapper:
     return ConfigWrapper(config)
 
 
-INJECTOR = NamekoInjector()
+INJECTOR = NamekoInjector([])
 
 
 @INJECTOR.decorate_service

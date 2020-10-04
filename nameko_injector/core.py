@@ -1,15 +1,18 @@
 import functools
 import logging
 import typing as t
-from weakref import WeakKeyDictionary
-import itertools
 
 import injector as inj
 from eventlet import corolocal
 from nameko.containers import ServiceContainer, WorkerContext
 from nameko.extensions import DependencyProvider
+from werkzeug.wrappers import Request
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class BaseError(Exception):
+    """Base error type for this library."""
 
 
 class RequestScope(inj.Scope):
@@ -20,6 +23,10 @@ class RequestScope(inj.Scope):
         # The type of locals is the only difference between this implementation and
         # injector.ThreadLocalScope
         self._locals = corolocal.local()
+
+    def _set(self, interface: t.Any, provider: inj.Provider) -> None:
+        # protected and shouldn't be used outside of the library
+        setattr(self._locals, repr(interface), provider)
 
     def get(self, interface: t.Any, provider: inj.Provider) -> inj.Provider:
         key = repr(interface)
@@ -52,7 +59,39 @@ request_scope = inj.ScopeDecorator(RequestScope)
 resource_request_scope = inj.ScopeDecorator(ResourceAwareRequestScope)
 
 
+class MissingInRequestScopeError(BaseError):
+    def __init__(self, interface):
+        super().__init__(
+            f"{interface} not found in the current request scope. "
+            "It means nameko_injector.NamekoInjectorProvider didn't work. "
+            "Ensure the dependency provider is present in the service "
+            "or not mocked when testing."
+        )
+
+    def provider(self):
+        raise self
+
+
 class NamekoInjector(inj.Injector):
+    def __init__(self, modules, *args, **kwargs):
+        super().__init__(modules, *args, **kwargs)
+        self._modules = modules
+        # This instance of injector will be shared between the service calls.
+        # NamekoInjectorProvider has a special logic to ensure that instances of these
+        # interfaces are injected properly from the request_scope.
+        # We still need to bind the interfaces so the injector knows what scope to use
+        # and also when provider didn't work provide a meaningful error.
+        self.binder.bind(
+            Request,
+            to=MissingInRequestScopeError(Request).provider,
+            scope=request_scope,
+        )
+        self.binder.bind(
+            WorkerContext,
+            to=MissingInRequestScopeError(WorkerContext).provider,
+            scope=request_scope,
+        )
+
     def decorate_service(self, service_cls):
         service_cls.injector = NamekoInjectorProvider(self)
 
@@ -81,43 +120,36 @@ class NamekoInjector(inj.Injector):
 
 
 class NamekoInjectorProvider(DependencyProvider):
-    def __init__(self, parent_injector: inj.Injector):
-        # Bindings from the parent injector are shared between the calls.
-        self.parent_injector = parent_injector
-        # Mapping of a worker context to child injector created for it.
-        # We need to be able to look up injector in different stages of the worker
-        # live-cycle.
-        self._injector_by_worker_ctx: WeakKeyDictionary = WeakKeyDictionary()
+    def __init__(self, injector: NamekoInjector):
+        self.injector = injector
 
     def setup(self):
-        # ServiceContainer is shared between the calls so it's in parent injector
-        self.parent_injector.binder.bind(
+        self.injector.binder.bind(
             ServiceContainer, to=self.container, scope=inj.singleton
         )
 
     def get_dependency(self, worker_ctx):
-        # Create child injector that will be used by decorated entrypoints.
-        # Having child injector is something that will help us in testing and also
-        # isolate request-level dependencies bound per entry-point.
-        child_injector = self.parent_injector.create_child_injector()
-        child_injector.binder.bind(WorkerContext, worker_ctx, scope=request_scope)
-        self._injector_by_worker_ctx[worker_ctx] = child_injector
-        return child_injector
+        # The injector is shared between the service calls therefore we cannot use bind
+        # InstanceProvider with the binder. Binding to a specific instance in one call
+        # may lead to a reference in another call (scope calls provider and gets
+        # incorrect instance).
+        # Put the instances of Request and WorkerContext directly in the
+        # request scope. As this dependency provider runs in scope of a call coroutine
+        # it's safe to access corolocal storage in the scope.
+        scope_binding, _ = self.injector.binder.get_binding(RequestScope)
+        scope_instance = scope_binding.provider.get(self.injector)
+
+        scope_instance = self.injector.get(request_scope.scope)
+        scope_instance._set(WorkerContext, inj.InstanceProvider(worker_ctx))
+        if worker_ctx.args and isinstance(worker_ctx.args[0], Request):
+            request = worker_ctx.args[0]
+            scope_instance._set(Request, inj.InstanceProvider(request))
+        return self.injector
 
     def worker_teardown(self, worker_ctx):
         """Called after a service worker has executed a task."""
-        # It's a good time to free resources in the request scope.
-        # Intentionally do not fallback to None if worker_ctx is not found. The service
-        # call won't fail but error should be reported in the logs.
-        child_injector = self._injector_by_worker_ctx.pop(worker_ctx)
-        # Normally, only when testing, child scope can have some resources. In the real
-        # app everything will be bound on the level of class injector (parent binder).
-        child_scope = child_injector.get(ResourceAwareRequestScope)
-        parent_scope = child_injector.parent.get(ResourceAwareRequestScope)
-
-        for closable in itertools.chain(
-            child_scope.iter_closable(), parent_scope.iter_closable()
-        ):
+        scope = self.injector.get(ResourceAwareRequestScope)
+        for closable in scope.iter_closable():
             try:
                 closable.close()
             except Exception:

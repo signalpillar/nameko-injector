@@ -1,17 +1,8 @@
-import typing as t
-import pytest
-import functools
-import json
 import eventlet
-from eventlet import corolocal
-
-from injector import Injector, Scope, singleton, Module
 import injector as inj
+import pytest
 
 from . import dummy_service
-
-# request-scope developed first?
-# provide nameko request-scope dependencies (worker context, request for HTTP)
 
 
 @pytest.fixture
@@ -61,7 +52,11 @@ class TestErrorRaisedDuringInjection:
     def injector_in_test(self, injector_in_test):
         # Override config binding on the service by specifying another one in
         # child injector that will be used on the service instance.
-        injector_in_test.binder.install(dummy_service.FailingConfigModule())
+        injector_in_test.binder.bind(
+            dummy_service.Config,
+            to=dummy_service.provide_failing_config,
+            scope=inj.singleton,
+        )
         return injector_in_test
 
     def test_http(self, web_session):

@@ -1,5 +1,6 @@
 import uuid
 from unittest import mock
+import injector as inj
 
 import pytest
 from nameko.containers import WorkerContext
@@ -13,6 +14,7 @@ from ..core import NamekoInjectorProvider
 def worker_ctx(service_class):
     # Redefine this fixture in your tests
     mocked_ctx = mock.Mock(spec=WorkerContext)
+    mocked_ctx.args = []
     mocked_ctx.service_name = service_class.name
     mocked_ctx.call_id = str(uuid.uuid4())
     return mocked_ctx
@@ -27,8 +29,9 @@ def injector_in_test(service_class, worker_ctx):
             f"if the service class {service_class} in test "
             "is not decorated with nameko-injector"
         )
-    child_injector = provider.get_dependency(worker_ctx)
-    return child_injector
+    injector = provider.injector.create_child_injector(provider.injector._modules)
+    injector.binder.bind(WorkerContext, to=inj.InstanceProvider(worker_ctx))
+    return injector
 
 
 @pytest.fixture
