@@ -8,7 +8,7 @@ Problem
 -------
 
 Nameko provides a dependency injection mechanism, built-in in the framework.
-It works in many cases but there are limitations:
+It works in many cases with the limitations:
 
 1. All the dependencies are injected regardless of whether they are used in the entry-point. For instance, all the dependencies will be injected for ``/health`` HTTP entry point.
 2. Dependencies cannot depend on each other.
@@ -38,7 +38,6 @@ The library provides 2 **scopes**:
 An example of the test that declares service class and configuration provider:
 
 .. code:: python
-   :emphasize-lines: 32-35
 
     import json
     import typing as t
@@ -109,7 +108,7 @@ have ``function`` pytest scope.
 
 - ``injector_in_test`` fixture gives access to the ``injector.Injector`` instance that will resolve the dependencies in the instance of ``service_class``.
   The fixture uses a child injector from the one that decorates the service that provides isolation between the test cases with the same class under the test.
-  By default it uses ``worker_context`` fixture.
+  By default, it uses ``worker_context`` fixture.
 
 - ``container_overridden_dependencies`` - ``web_service`` uses this mapping of
   nameko dependencies that need to be overridden with the instance values.
