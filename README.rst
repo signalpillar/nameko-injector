@@ -27,11 +27,6 @@ be used out of the box without special injector module declarations.
 - ``from nameko.containers.WorkerContext``
 - ``werkzeug.wrappers.Request``, in case of HTTP requests
 
-An example of the test that declares service class and configuration provider:
-
-.. literalinclude:: tests/test_readme_example.py
-   :language: python
-
 The library provides 2 **scopes**:
 
 - ``nameko_injector.core.request_scope`` where each request has own instance of
@@ -39,6 +34,51 @@ The library provides 2 **scopes**:
 - ``nameko_injected.core.resource_request_scope`` it's like ``request_scope``
   but also ``close`` method is called on each injected value after the request
   is processed to free the resources on ``DependencyProvider.worker_teardown`` call.
+
+An example of the test that declares service class and configuration provider:
+
+.. code:: python
+
+    import json
+    import typing as t
+
+    import injector
+    import pytest
+    from nameko.containers import ServiceContainer
+    from nameko.web.handlers import http
+    from nameko_injector.core import NamekoInjector
+
+
+    class ServiceConfig:
+        value: t.Mapping
+
+
+    @injector.provider
+    def provide_service_config(container: ServiceContainer) -> ServiceConfig:
+        return container.config
+
+
+    def configure(binder):
+        binder.bind(
+            ServiceConfig,
+            to=provide_service_config,
+            scope=injector.singleton,
+        )
+
+
+    INJECTOR = NamekoInjector(configure)
+
+
+    @INJECTOR.decorate_service
+    class Service:
+
+        name = "service-name"
+
+        @http("GET", "/config")
+        def view_config(self, request, config: ServiceConfig):
+            # 'config' is injected as singleton in each request that specifies it's type in
+            # the view function's signature.
+            return json.dumps(config)
 
 Testing with library (pytest)
 -----------------------------
@@ -101,8 +141,3 @@ Main line there is ``replace_dependencies(container, **container_overridden_depe
 Development
 -----------
 `tox`
-
-TODO
-----
-
-- testing: Add the tests for RPC entry points
