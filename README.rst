@@ -27,33 +27,22 @@ be used out of the box without special injector module declarations.
 - ``from nameko.containers.WorkerContext``
 - ``werkzeug.wrappers.Request``, in case of HTTP requests
 
-An example:
+An example of the test that declares service class and configuration provider:
 
-.. code:: python
+.. literalinclude:: tests/test_readme_example.py
+   :language: python
 
-    import json
-    from nameko_injector.core import NamekoInjector, ServiceConfig
-    from nameko.web.handlers import http
+The library provides 2 **scopes**:
 
-
-    INJECTOR = NamekoInjector()
-
-    @INJECTOR.decorate_service
-    class Service:
-
-      name = 'service-name'
-
-      @http('GET', '/health')
-      def health(self, request):
-         return {'status': 'ok'}
-
-      @http('GET', '/config')
-      def view_config(self, request, config: ServiceConfig):
-        return json.dumps(config)
+- ``nameko_injector.core.request_scope`` where each request has own instance of
+  the injected type.
+- ``nameko_injected.core.resource_request_scope`` it's like ``request_scope``
+  but also ``close`` method is called on each injected value after the request
+  is processed to free the resources on ``DependencyProvider.worker_teardown`` call.
 
 Testing with library (pytest)
 -----------------------------
-The library provides a module for pytest that provides some basic fixtures.
+The library provides a plugin for pytest with some basic fixtures.
 To enable the plugin, add the following line in your ``conftest.py`` module.
 
 .. code:: python
@@ -75,10 +64,11 @@ have ``function`` pytest scope.
 
 - ``service_class`` fixture that **MUST** be redefined and return a service class under the test.
 
-- ``web_service`` fixture starts a real HTTP server to make real HTTP requests to our service. It can be used together with nameko's fixture ``web_session`` that injects HTTP client that knows a correct port. See ``tests/test_injected.py`` as an example.
+- ``web_service`` fixture starts a real HTTP server to make real HTTP requests to the service. It can be used together with nameko's fixture ``web_session`` that injects HTTP client that knows a correct port. See ``tests/test_injected.py`` as an example.
 
-- ``injector_in_test`` fixture gives access to the ``injector.Injector`` instance that will resolve the dependencies in the service instance of ``service_class``.
+- ``injector_in_test`` fixture gives access to the ``injector.Injector`` instance that will resolve the dependencies in the instance of ``service_class``.
   The fixture uses a child injector from the one that decorates the service that provides isolation between the test cases with the same class under the test.
+  By default it uses ``worker_context`` fixture.
 
 - ``container_overridden_dependencies`` - ``web_service`` uses this mapping of
   nameko dependencies that need to be overridden with the instance values.

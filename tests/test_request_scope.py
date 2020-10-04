@@ -18,7 +18,7 @@ def provide_wrapped_config(config: Config) -> ConfigWrapper:
     return ConfigWrapper(config)
 
 
-INJECTOR = NamekoInjector()
+INJECTOR = NamekoInjector([])
 
 
 @INJECTOR.decorate_service

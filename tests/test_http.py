@@ -5,7 +5,11 @@ import typing as t
 import injector as inj
 import pytest
 from nameko.web.handlers import http
-from nameko_injector.core import NamekoInjector, request_scope
+from nameko_injector.core import (
+    NamekoInjector,
+    request_scope,
+    MissingInRequestScopeError,
+)
 from werkzeug.wrappers import Request
 
 
@@ -24,6 +28,14 @@ def test_http_request_injected(web_session, web_service):
         "header_value": debug_id,
         "same_request": True,
     } == response.json()
+
+
+def test_http_request_access_failed(injector_in_test):
+    # HTTP request is already bound in the NamekoInjector with expectation that it's
+    # already set in the scope. In this case it's not set without HTTP call and also we
+    # call from a different coroutine.
+    with pytest.raises(MissingInRequestScopeError):
+        injector_in_test.get(Request)
 
 
 _HEADER_NAME = "debug-id"
