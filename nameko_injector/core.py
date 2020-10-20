@@ -3,7 +3,7 @@ import logging
 import typing as t
 
 import injector as inj
-from eventlet import corolocal
+from eventlet import corolocal, greenthread
 from nameko.containers import ServiceContainer, WorkerContext
 from nameko.extensions import DependencyProvider
 from werkzeug.wrappers import Request
@@ -23,6 +23,19 @@ class RequestScope(inj.Scope):
         # The type of locals is the only difference between this implementation and
         # injector.ThreadLocalScope
         self._locals = corolocal.local()
+
+    def remove_thread_ref(self):
+        """Remove current thread from the internal storage."""
+        # if we don't remove the thread manually it will stay there forever.
+        # Current implementation of the corolocal uses
+        # weakref.WeakKeyDictionary[Thread, State] and State should be removed from the
+        # dict if the key (Thread) is not referenced any more. But even using two scopes
+        # from this project 'RequestScope' and 'ResourceAwareRequestScope' may prevent
+        # that removing as both point to the same thread in their corolocal.local
+        # instances.
+        current_thread = greenthread.getcurrent()
+        if current_thread in self._locals._local__greens:
+            del self._locals._local__greens[current_thread]
 
     def _set(self, interface: t.Any, provider: inj.Provider) -> None:
         # protected and shouldn't be used outside of the library
@@ -136,9 +149,6 @@ class NamekoInjectorProvider(DependencyProvider):
         # Put the instances of Request and WorkerContext directly in the
         # request scope. As this dependency provider runs in scope of a call coroutine
         # it's safe to access corolocal storage in the scope.
-        scope_binding, _ = self.injector.binder.get_binding(RequestScope)
-        scope_instance = scope_binding.provider.get(self.injector)
-
         scope_instance = self.injector.get(request_scope.scope)
         scope_instance._set(WorkerContext, inj.InstanceProvider(worker_ctx))
         if worker_ctx.args and isinstance(worker_ctx.args[0], Request):
@@ -148,13 +158,20 @@ class NamekoInjectorProvider(DependencyProvider):
 
     def worker_teardown(self, worker_ctx):
         """Called after a service worker has executed a task."""
+        self.injector.get(request_scope.scope).remove_thread_ref()
         scope = self.injector.get(ResourceAwareRequestScope)
-        for closable in scope.iter_closable():
-            try:
-                closable.close()
-            except Exception:
-                _LOGGER.exception(
-                    "Failed to close request-scoped resource %r on worker teardown. "
-                    "Will attempt to close the rest of resources in the request scope.",
-                    closable.__class__,
-                )
+
+        try:
+            for closable in scope.iter_closable():
+                try:
+                    closable.close()
+                except Exception:
+                    _LOGGER.exception(
+                        "Failed to close request-scoped resource %r on worker teardown."
+                        " Will attempt to close the rest of resources in this scope.",
+                        closable.__class__,
+                    )
+        finally:
+            # ensure that we remove state for the current thread from scope to avoid
+            # memory leaks for cases when resource failed to clean up
+            scope.remove_thread_ref()
